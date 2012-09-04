@@ -16,6 +16,19 @@ T_MIN = getattr(settings, 'TAGCLOUD_MIN', 1.0)
 
 register = template.Library()
 
+class TagMock(object):
+
+    def __init(self):
+        self.name = None
+        self.num_times = 0
+        self.weight = 0
+        
+    def __str__(self):
+        return unicode(self).encode('utf-8')
+        
+    def __unicode__(self):
+        return u"%s" % self.name
+
 def get_queryset(forvar=None):
     if None == forvar:
         # get all tags
@@ -45,9 +58,9 @@ def get_queryset(forvar=None):
     # a version check (for example taggit.VERSION <= (0,8,0)) does NOT
     # work because of the version (0,8,0) of the current dev version of django-taggit
     try:
-        return queryset.annotate(num_times=Count('taggeditem_items'))
+        return queryset.values('name').annotate(num_times=Count('taggeditem_items'))
     except FieldError:
-        return queryset.annotate(num_times=Count('taggit_taggeditem_items'))
+        return queryset.values('name').annotate(num_times=Count('taggit_taggeditem_items'))
 
 def get_weight_fun(t_min, t_max, f_min, f_max):
     def weight_fun(f_i, t_min=t_min, t_max=t_max, f_min=f_min, f_max=f_max):
@@ -78,8 +91,20 @@ def get_tagcloud(context, asvar, forvar=None):
     weight_fun = get_weight_fun(T_MIN, T_MAX, min(num_times), max(num_times))
     queryset = queryset.order_by('name')
     for tag in queryset:
-        tag.weight = weight_fun(tag.num_times)
-    context[asvar] = queryset
+        tag['weight'] = weight_fun(tag['num_times'])
+        #tag.weight = weight_fun(tag.num_times)
+        
+    # generate a mock object for tag
+    # other option would be return the tag dictionary and create a filter to lookup keys
+    tag_mock = []
+    for tag in queryset:
+        tag_mock_object           = TagMock()
+        tag_mock_object.name      = tag['name']
+        tag_mock_object.weight    = tag['weight']
+        tag_mock_object.num_times = tag['num_times']
+        tag_mock.append(tag_mock_object)
+
+    context[asvar] = tag_mock
     return ''
     
 def include_tagcloud(forvar=None):
